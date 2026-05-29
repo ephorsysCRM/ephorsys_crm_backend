@@ -6,6 +6,7 @@ import {
   registerAdmin,
 } from "../controllers/admin.controller.js";
 import protect from "../middleware/auth.middleware.js";
+import isEmployeeMiddleware from "../middleware/isEmployee.middleware.js";
 
 const router = express.Router();
 
@@ -17,9 +18,11 @@ const router = express.Router();
 // POST -> /api/v1/admin/register
 router.post("/register", registerAdmin);
 
-// Login Admin
+// Login Admin or BDE Employee
 // POST -> /api/v1/admin/login
-router.post("/login", loginAdmin);
+// Middleware checks if the user is a BDE employee first;
+// if not, falls through to loginAdmin.
+router.post("/login", isEmployeeMiddleware, loginAdmin);
 
 // Logout Admin
 // POST -> /api/v1/admin/logout
