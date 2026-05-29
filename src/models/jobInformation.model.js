@@ -17,6 +17,7 @@ const jobInformationSchema = new mongoose.Schema(
     // ─────────────────────────────────────────
     department: {
       type: String,
+      enum: ["Software Development", "Human Resources", "Sales", "Marketing", "Others", "Business Development Executive", "UI / UX Designer"],
       required: [true, "Department is required"],
       trim: true,
     },
