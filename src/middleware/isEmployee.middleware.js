@@ -1,6 +1,6 @@
 import EmployeeModel from "../models/employee.model.js";
 import JobInformationModel from "../models/jobInformation.model.js";
-import generateToken from "../util/generateToken.js";
+import generateToken from "../utils/generateToken.js";
 
 // --------------------------------------------------------------
 // isEmployeeMiddleware
