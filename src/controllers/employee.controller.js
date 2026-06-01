@@ -5,7 +5,7 @@ import PayrollModel from "../models/payroll.model.js";
 import EducationDetailModel from "../models/educationDetail.model.js";
 import ExperienceDetailModel from "../models/experienceDetail.model.js";
 import DocumentModel from "../models/document.model.js";
-import generateToken from "../util/generateToken.js";
+import generateToken from "../utils/generateToken.js";
 import {
   validateFileSizes,
   uploadToCloudinary,

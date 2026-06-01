@@ -1,5 +1,5 @@
 import AdminModel from "../models/admin.model.js";
-import generateToken from "../util/generateToken.js";
+import generateToken from "../utils/generateToken.js";
 // -----------------------------------------------------
 // @description -   Register Admin
 // @route -   POST /api/v1/admin/register

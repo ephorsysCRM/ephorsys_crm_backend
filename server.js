@@ -6,6 +6,7 @@ import http from "http";
 
 import app from "./src/app.js";
 import connectToDb from "./src/config/db/db.js";
+import { startMissedFollowUpScheduler } from "./src/utils/scheduler.js";
 
 import { Server } from "socket.io";
 // ======================================================
@@ -50,6 +51,9 @@ io.on("connection", (socket) => {
 const startServer = async () => {
   try {
     await connectToDb();
+    
+    // Start Scheduler
+    startMissedFollowUpScheduler();
 
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
