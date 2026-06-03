@@ -353,6 +353,17 @@ export const getLeads = asyncHandler(async (req, res) => {
       filter.leadStatus = { $in: ["Not Picked", "Interested", "Meeting"] };
       filter.isActive = true;
       break;
+    case "todayAttempted":
+      const startOfDay1 = new Date(); startOfDay1.setHours(0, 0, 0, 0);
+      const endOfDay1 = new Date(); endOfDay1.setHours(23, 59, 59, 999);
+      filter["callLogs.calledAt"] = { $gte: startOfDay1, $lte: endOfDay1 };
+      break;
+    case "todayFollowUps":
+      const startOfDay2 = new Date(); startOfDay2.setHours(0, 0, 0, 0);
+      const endOfDay2 = new Date(); endOfDay2.setHours(23, 59, 59, 999);
+      filter.nextFollowUpDate = { $gte: startOfDay2, $lte: endOfDay2 };
+      filter.leadStatus = { $in: ["Not Picked", "Interested"] };
+      break;
     case "all":
     default:
       break; // no extra filter
