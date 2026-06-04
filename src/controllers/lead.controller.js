@@ -1,6 +1,70 @@
 import Lead, { CALL_STATUS } from "../models/lead.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
+import { getIO } from "../config/socketInstance.js";
+
+// ─────────────────────────────────────────────
+// SOCKET HELPER: Emit live update to an employee room
+// ─────────────────────────────────────────────
+const emitLeadUpdate = async (userId) => {
+  try {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const scope = { assignedTo: userId };
+
+    const [
+      totalLeads,
+      todayAttempted,
+      todayFollowUps,
+      todayMeetings,
+      missedFollowUps,
+      interestedCount,
+      notPickedCount,
+      rejectedCount,
+      closedWonCount,
+      followUpLeads,
+    ] = await Promise.all([
+      Lead.countDocuments({ ...scope }),
+      Lead.countDocuments({ ...scope, "callLogs.calledAt": { $gte: startOfToday, $lte: endOfToday } }),
+      Lead.countDocuments({ ...scope, nextFollowUpDate: { $gte: startOfToday, $lte: endOfToday }, leadStatus: { $in: ["Not Picked", "Interested"] } }),
+      Lead.countDocuments({ ...scope, "meetings.meetingDate": { $gte: startOfToday, $lte: endOfToday }, leadStatus: "Meeting" }),
+      Lead.countDocuments({ ...scope, nextFollowUpDate: { $lt: startOfToday }, leadStatus: { $in: ["Not Picked", "Interested", "Meeting"] }, isActive: true }),
+      Lead.countDocuments({ ...scope, leadStatus: "Interested" }),
+      Lead.countDocuments({ ...scope, leadStatus: "Not Picked" }),
+      Lead.countDocuments({ ...scope, leadStatus: { $in: ["Closed Lost", "Rejected"] } }),
+      Lead.countDocuments({ ...scope, leadStatus: "Closed Won" }),
+      // Full follow-up list for today (for instant list refresh)
+      Lead.find({
+        ...scope,
+        nextFollowUpDate: { $gte: startOfToday, $lte: endOfToday },
+        leadStatus: { $in: ["Not Picked", "Interested"] },
+      })
+        .populate("assignedTo", "firstName lastName officialEmail")
+        .sort({ nextFollowUpDate: 1 })
+        .limit(50)
+        .lean(),
+    ]);
+
+    const statsPayload = {
+      totalLeads, todayAttempted, todayFollowUps, todayMeetings, missedFollowUps,
+      pipeline: { interested: interestedCount, notPicked: notPickedCount, rejected: rejectedCount, closedWon: closedWonCount },
+    };
+
+    const io = getIO();
+    if (!io) return; // Socket not initialized yet
+
+    // Emit stats update (picked up by Dashboard & Lead page ribbon)
+    io.to(userId.toString()).emit("lead:stats_updated", statsPayload);
+
+    // Emit daily follow-ups list (picked up by MetricListModal when open)
+    io.to(userId.toString()).emit("lead:follow_ups_updated", followUpLeads);
+  } catch (err) {
+    console.error("Socket emitLeadUpdate error:", err.message);
+  }
+};
 
 // ─────────────────────────────────────────────
 // HELPER: Get active user ID (works for both Admin and Employee)
@@ -118,6 +182,9 @@ export const createLead = asyncHandler(async (req, res) => {
     .populate("assignedTo", "firstName lastName officialEmail")
     .populate("createdBy", "firstName lastName officialEmail");
 
+  // Notify all connected tabs of the employee with fresh data
+  emitLeadUpdate(userId);
+
   res.status(201).json({
     success: true,
     message: "Lead created successfully.",
@@ -197,6 +264,9 @@ export const updateCallStatus = asyncHandler(async (req, res) => {
     throw new AppError("Invalid callStatus provided.", 400);
   }
 
+  // Push live stats + follow-up list to the employee
+  emitLeadUpdate(userId);
+
   res.status(200).json({
     success: true,
     message: "Call status updated successfully.",
@@ -253,6 +323,9 @@ export const scheduleMeeting = asyncHandler(async (req, res) => {
   lead.nextFollowUpDate = new Date(meetingDate); // treat meeting as next touchpoint
   await lead.save();
 
+  // Push live stats to the employee
+  emitLeadUpdate(userId);
+
   res.status(200).json({
     success: true,
     message: "Meeting scheduled.",
@@ -307,6 +380,9 @@ export const closeLead = asyncHandler(async (req, res) => {
   }
 
   await lead.save();
+
+  // Push live stats to the employee
+  emitLeadUpdate(userId);
 
   res.status(200).json({
     success: true,
