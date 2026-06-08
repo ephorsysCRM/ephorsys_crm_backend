@@ -56,18 +56,10 @@ const jobInformationSchema = new mongoose.Schema(
     },
     employmentStatus: {
       type: String,
-      enum: ["Active", "Notice Period", "Resigned", "Terminated"],
+      enum: ["Active", "Inactive", "Notice Period", "Resigned", "Terminated"],
       default: "Active",
     },
 
-    // ─────────────────────────────────────────
-    // Reporting Manager (optional self-ref)
-    // ─────────────────────────────────────────
-    // reportingManager: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "Employee",
-    //   default: null,
-    // },
   },
   { timestamps: true }
 );

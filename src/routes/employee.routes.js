@@ -10,6 +10,7 @@ import {
   getEmployeeById,
   getAllEmployees,
   getDocumentFile,
+  updateEmployee,
 } from "../controllers/employee.controller.js";
 
 const router = express.Router();
@@ -54,5 +55,9 @@ router.get("/all", protect, getAllEmployees);
 // Get Single Employee by ID (Admin Only)
 // GET -> /api/v1/employee/:id
 router.get("/:id", protect, getEmployeeById);
+
+// Update Employee Fields (Admin Only)
+// PATCH -> /api/v1/employee/:id
+router.patch("/:id", protect, updateEmployee);
 
 export default router;

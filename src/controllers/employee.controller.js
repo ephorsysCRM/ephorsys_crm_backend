@@ -247,6 +247,7 @@ export const registerEmployee = async (req, res) => {
       country,
       zipCode,
       password,
+      isActive: employmentStatus ? ["Active", "Notice Period"].includes(employmentStatus) : true,
       createdBy: req.admin._id,
     });
     await employee.save({ session });
@@ -658,6 +659,86 @@ export const getEmployeeById = async (req, res) => {
   } catch (error) {
     console.error("Get Employee By ID Error:", error);
 
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// @description  -  Update Employee Field
+// @route        -  PATCH /api/v1/employee/:id
+// @access       -  Private (Admin)
+// ─────────────────────────────────────────────────────────────────────────────
+export const updateEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { root, jobInformation, payroll, educationDetails, experienceDetails } = req.body;
+
+    const employee = await EmployeeModel.findById(id);
+    if (!employee) {
+      return res.status(404).json({ success: false, message: "Employee not found" });
+    }
+
+    if (root) {
+      await EmployeeModel.findByIdAndUpdate(id, { $set: root }, { new: true });
+    }
+
+    if (jobInformation) {
+      if (employee.jobInformation) {
+        await JobInformationModel.findByIdAndUpdate(employee.jobInformation, { $set: jobInformation });
+      } else {
+        const newJob = await JobInformationModel.create({ ...jobInformation, employee: id });
+        employee.jobInformation = newJob._id;
+        await employee.save();
+      }
+
+      // Sync isActive status based on employmentStatus
+      if (jobInformation.employmentStatus) {
+        const activeStatuses = ["Active", "Notice Period"];
+        employee.isActive = activeStatuses.includes(jobInformation.employmentStatus);
+        await employee.save();
+      }
+    }
+
+    if (payroll) {
+      if (employee.payroll) {
+        await PayrollModel.findByIdAndUpdate(employee.payroll, { $set: payroll });
+      } else {
+        const newPayroll = await PayrollModel.create({ ...payroll, employee: id });
+        employee.payroll = newPayroll._id;
+        await employee.save();
+      }
+    }
+
+    if (educationDetails) {
+      if (employee.educationDetails && employee.educationDetails.length > 0) {
+        await EducationDetailModel.findByIdAndUpdate(employee.educationDetails[0], { $set: educationDetails });
+      } else {
+        const newEdu = await EducationDetailModel.create({ ...educationDetails, employee: id });
+        employee.educationDetails = [newEdu._id];
+        await employee.save();
+      }
+    }
+
+    if (experienceDetails) {
+      if (employee.experienceDetails && employee.experienceDetails.length > 0) {
+        await ExperienceDetailModel.findByIdAndUpdate(employee.experienceDetails[0], { $set: experienceDetails });
+      } else {
+        const newExp = await ExperienceDetailModel.create({ ...experienceDetails, employee: id });
+        employee.experienceDetails = [newExp._id];
+        await employee.save();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Employee updated successfully"
+    });
+  } catch (error) {
+    console.error("Update Employee Error:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
