@@ -6,7 +6,7 @@ const connectToDb = () => {
       console.log("Database is Connected");
     })
     .catch((err) => {
-      console.log("Error Connecting To Db");
+      console.error("Error Connecting To Db:", err.message);
       process.exit(1);
     });
 };
