@@ -28,12 +28,15 @@ app.use(cookieParser());
 // ---------------------------------------------
 app.use(morgan("dev"));
 
-
 // ---------------------------------------------
 // API Prefix
 // ---------------------------------------------
 
 app.use("/api/v1", router);
+
+app.get("/test", (req, res) => {
+  res.json({ message: "API Working" });
+});
 
 // ---------------------------------------------
 // Global Error Handler
@@ -41,7 +44,7 @@ app.use("/api/v1", router);
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || "Internal Server Error";
-  
+
   if (statusCode === 500) {
     console.error("Global Error:", err);
   }
