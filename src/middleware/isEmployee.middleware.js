@@ -98,7 +98,7 @@ const isEmployeeMiddleware = async (req, res, next) => {
 
     const cookieOption = {
       httpOnly: true,
-      secure: false, // set true in production
+      secure: true, // set true in production
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
