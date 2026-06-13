@@ -3,6 +3,7 @@ import morgan from "morgan";
 import router from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import AppError from "./utils/AppError.js";
 
 const app = express();
 
@@ -33,6 +34,24 @@ app.use(morgan("dev"));
 // ---------------------------------------------
 
 app.use("/api/v1", router);
+
+// ---------------------------------------------
+// Global Error Handler
+// ---------------------------------------------
+app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  
+  if (statusCode === 500) {
+    console.error("Global Error:", err);
+  }
+
+  res.status(statusCode).json({
+    success: false,
+    message,
+    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
+  });
+});
 
 export default app;
 
