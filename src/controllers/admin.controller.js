@@ -117,8 +117,8 @@ export const loginAdmin = async (req, res) => {
     // ----------------------------------------------
     const cookieOption = {
       httpOnly: true,
-      secure: false, // true in production
-      sameSite: "lax",
+      secure: true,
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
 
@@ -155,7 +155,6 @@ export const loginAdmin = async (req, res) => {
 //@route - POST  /api/v1/admin/logout
 //@access Private
 //-------------------------------------------------------
-
 
 export const LogoutAdmin = async (req, res) => {
   try {
