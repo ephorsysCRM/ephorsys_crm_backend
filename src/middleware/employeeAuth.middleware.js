@@ -29,7 +29,7 @@ const protectEmployee = async (req, res, next) => {
     // Find Employee (not Admin)
     // ----------------------------------------------
     const employee = await EmployeeModel.findById(decoded.id).select(
-      "-password"
+      "-password",
     );
 
     if (!employee) {
@@ -60,6 +60,10 @@ export default protectEmployee;
 
 export const protectAny = async (req, res, next) => {
   try {
+    console.log("========== PROTECT ANY ==========");
+    console.log("Origin:", req.headers.origin);
+    console.log("Cookie Header:", req.headers.cookie);
+    console.log("Cookies:", req.cookies);
     const token = req.cookies.token;
 
     if (!token) {
@@ -72,7 +76,9 @@ export const protectAny = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Try finding employee first
-    const employee = await EmployeeModel.findById(decoded.id).select("-password");
+    const employee = await EmployeeModel.findById(decoded.id).select(
+      "-password",
+    );
     if (employee) {
       if (!employee.isActive) {
         return res.status(403).json({

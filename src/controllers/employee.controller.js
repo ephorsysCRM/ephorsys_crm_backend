@@ -212,7 +212,7 @@ export const registerEmployee = async (req, res) => {
     if (files.profilePhoto && files.profilePhoto[0]) {
       const result = await uploadToCloudinary(
         files.profilePhoto[0].buffer,
-        "employees/profile"
+        "employees/profile",
       );
       profilePhotoUrl = result.secure_url;
       profilePhotoCloudinaryId = result.public_id;
@@ -247,7 +247,9 @@ export const registerEmployee = async (req, res) => {
       country,
       zipCode,
       password,
-      isActive: employmentStatus ? ["Active", "Notice Period"].includes(employmentStatus) : true,
+      isActive: employmentStatus
+        ? ["Active", "Notice Period"].includes(employmentStatus)
+        : true,
       createdBy: req.admin._id,
     });
     await employee.save({ session });
@@ -322,9 +324,7 @@ export const registerEmployee = async (req, res) => {
       let parsedExperience;
       try {
         parsedExperience =
-          typeof experience === "string"
-            ? JSON.parse(experience)
-            : experience;
+          typeof experience === "string" ? JSON.parse(experience) : experience;
       } catch {
         parsedExperience = [experience];
       }
@@ -378,7 +378,7 @@ export const registerEmployee = async (req, res) => {
           // Upload image to Cloudinary
           const cloudResult = await uploadToCloudinary(
             file.buffer,
-            `employees/documents/${fieldName}`
+            `employees/documents/${fieldName}`,
           );
           documentRecords.push({
             employee: employee._id,
@@ -399,7 +399,7 @@ export const registerEmployee = async (req, res) => {
       const file = files.passportPhoto[0];
       const cloudResult = await uploadToCloudinary(
         file.buffer,
-        "employees/documents/passportPhoto"
+        "employees/documents/passportPhoto",
       );
       documentRecords.push({
         employee: employee._id,
@@ -441,7 +441,7 @@ export const registerEmployee = async (req, res) => {
     // 14. Fetch fully populated response
     // ─────────────────────────────────────────
     const employeeData = await populateEmployee(
-      EmployeeModel.findById(employee._id)
+      EmployeeModel.findById(employee._id),
     );
 
     return res.status(201).json({
@@ -454,7 +454,10 @@ export const registerEmployee = async (req, res) => {
     session.endSession();
 
     // Rollback uploaded files from Cloudinary
-    if (typeof uploadedCloudinaryIds !== "undefined" && uploadedCloudinaryIds.length > 0) {
+    if (
+      typeof uploadedCloudinaryIds !== "undefined" &&
+      uploadedCloudinaryIds.length > 0
+    ) {
       for (const publicId of uploadedCloudinaryIds) {
         await deleteFromCloudinary(publicId);
       }
@@ -529,8 +532,9 @@ export const loginEmployee = async (req, res) => {
 
     const cookieOption = {
       httpOnly: true,
-      secure: true, // set true in production
+      secure: true,
       sameSite: "none",
+      path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
 
@@ -580,8 +584,9 @@ export const logoutEmployee = async (req, res) => {
   try {
     res.clearCookie("token", {
       httpOnly: true,
-      sameSite: "none", // must match the options used when the cookie was set
       secure: true,
+      sameSite: "none",
+      path: "/",
     });
 
     return res.status(200).json({
@@ -608,7 +613,7 @@ export const logoutEmployee = async (req, res) => {
 export const getEmployeeProfile = async (req, res) => {
   try {
     const employee = await populateEmployee(
-      EmployeeModel.findById(req.employee._id)
+      EmployeeModel.findById(req.employee._id),
     );
 
     if (!employee) {
@@ -642,7 +647,7 @@ export const getEmployeeProfile = async (req, res) => {
 export const getEmployeeById = async (req, res) => {
   try {
     const employee = await populateEmployee(
-      EmployeeModel.findById(req.params.id)
+      EmployeeModel.findById(req.params.id),
     );
 
     if (!employee) {
@@ -675,11 +680,19 @@ export const getEmployeeById = async (req, res) => {
 export const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
-    const { root, jobInformation, payroll, educationDetails, experienceDetails } = req.body;
+    const {
+      root,
+      jobInformation,
+      payroll,
+      educationDetails,
+      experienceDetails,
+    } = req.body;
 
     const employee = await EmployeeModel.findById(id);
     if (!employee) {
-      return res.status(404).json({ success: false, message: "Employee not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Employee not found" });
     }
 
     if (root) {
@@ -688,9 +701,14 @@ export const updateEmployee = async (req, res) => {
 
     if (jobInformation) {
       if (employee.jobInformation) {
-        await JobInformationModel.findByIdAndUpdate(employee.jobInformation, { $set: jobInformation });
+        await JobInformationModel.findByIdAndUpdate(employee.jobInformation, {
+          $set: jobInformation,
+        });
       } else {
-        const newJob = await JobInformationModel.create({ ...jobInformation, employee: id });
+        const newJob = await JobInformationModel.create({
+          ...jobInformation,
+          employee: id,
+        });
         employee.jobInformation = newJob._id;
         await employee.save();
       }
@@ -698,16 +716,23 @@ export const updateEmployee = async (req, res) => {
       // Sync isActive status based on employmentStatus
       if (jobInformation.employmentStatus) {
         const activeStatuses = ["Active", "Notice Period"];
-        employee.isActive = activeStatuses.includes(jobInformation.employmentStatus);
+        employee.isActive = activeStatuses.includes(
+          jobInformation.employmentStatus,
+        );
         await employee.save();
       }
     }
 
     if (payroll) {
       if (employee.payroll) {
-        await PayrollModel.findByIdAndUpdate(employee.payroll, { $set: payroll });
+        await PayrollModel.findByIdAndUpdate(employee.payroll, {
+          $set: payroll,
+        });
       } else {
-        const newPayroll = await PayrollModel.create({ ...payroll, employee: id });
+        const newPayroll = await PayrollModel.create({
+          ...payroll,
+          employee: id,
+        });
         employee.payroll = newPayroll._id;
         await employee.save();
       }
@@ -715,9 +740,15 @@ export const updateEmployee = async (req, res) => {
 
     if (educationDetails) {
       if (employee.educationDetails && employee.educationDetails.length > 0) {
-        await EducationDetailModel.findByIdAndUpdate(employee.educationDetails[0], { $set: educationDetails });
+        await EducationDetailModel.findByIdAndUpdate(
+          employee.educationDetails[0],
+          { $set: educationDetails },
+        );
       } else {
-        const newEdu = await EducationDetailModel.create({ ...educationDetails, employee: id });
+        const newEdu = await EducationDetailModel.create({
+          ...educationDetails,
+          employee: id,
+        });
         employee.educationDetails = [newEdu._id];
         await employee.save();
       }
@@ -725,9 +756,15 @@ export const updateEmployee = async (req, res) => {
 
     if (experienceDetails) {
       if (employee.experienceDetails && employee.experienceDetails.length > 0) {
-        await ExperienceDetailModel.findByIdAndUpdate(employee.experienceDetails[0], { $set: experienceDetails });
+        await ExperienceDetailModel.findByIdAndUpdate(
+          employee.experienceDetails[0],
+          { $set: experienceDetails },
+        );
       } else {
-        const newExp = await ExperienceDetailModel.create({ ...experienceDetails, employee: id });
+        const newExp = await ExperienceDetailModel.create({
+          ...experienceDetails,
+          employee: id,
+        });
         employee.experienceDetails = [newExp._id];
         await employee.save();
       }
@@ -735,7 +772,7 @@ export const updateEmployee = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Employee updated successfully"
+      message: "Employee updated successfully",
     });
   } catch (error) {
     console.error("Update Employee Error:", error);
@@ -774,7 +811,7 @@ export const getAllEmployees = async (req, res) => {
     // If no filters, use simple populate
     if (!hasJobFilter) {
       const employees = await populateEmployee(
-        EmployeeModel.find().sort({ createdAt: -1 })
+        EmployeeModel.find().sort({ createdAt: -1 }),
       );
 
       return res.status(200).json({
@@ -795,7 +832,9 @@ export const getAllEmployees = async (req, res) => {
           as: "jobInformation",
         },
       },
-      { $unwind: { path: "$jobInformation", preserveNullAndEmptyArrays: false } },
+      {
+        $unwind: { path: "$jobInformation", preserveNullAndEmptyArrays: false },
+      },
 
       // Apply filters
       { $match: jobFilter },
@@ -899,7 +938,10 @@ export const getDocumentFile = async (req, res) => {
     }
 
     // Authorization: Employees can only view their own documents; Admins can view any
-    if (req.employee && req.employee._id.toString() !== document.employee.toString()) {
+    if (
+      req.employee &&
+      req.employee._id.toString() !== document.employee.toString()
+    ) {
       return res.status(403).json({
         success: false,
         message: "Access Denied: You can only access your own documents",
@@ -916,7 +958,7 @@ export const getDocumentFile = async (req, res) => {
       res.setHeader("Content-Type", document.mimeType);
       res.setHeader(
         "Content-Disposition",
-        `inline; filename="${document.originalName}"`
+        `inline; filename="${document.originalName}"`,
       );
       return res.send(document.fileData);
     }
