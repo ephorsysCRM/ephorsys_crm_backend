@@ -529,8 +529,8 @@ export const loginEmployee = async (req, res) => {
 
     const cookieOption = {
       httpOnly: true,
-      secure: true,
-      sameSite: "none", // must be "none" for cross-site (frontend & backend on different domains)
+      secure: true, // set true in production
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
 
