@@ -164,8 +164,8 @@ export const LogoutAdmin = async (req, res) => {
 
     res.clearCookie("token", {
       httpOnly: true,
-      sameSite: "lax",
-      secure: false, // true in production
+      sameSite: "none", // must match the options used when the cookie was set
+      secure: true,
     });
 
     // ------------------------------------------
