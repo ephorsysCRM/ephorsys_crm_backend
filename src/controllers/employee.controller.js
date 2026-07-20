@@ -530,7 +530,7 @@ export const loginEmployee = async (req, res) => {
     const cookieOption = {
       httpOnly: true,
       secure: true, // set true in production
-      sameSite: "lax",
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
 
