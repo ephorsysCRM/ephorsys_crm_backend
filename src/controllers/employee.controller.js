@@ -529,8 +529,8 @@ export const loginEmployee = async (req, res) => {
 
     const cookieOption = {
       httpOnly: true,
-      secure: true, // set true in production
-      sameSite: "lax",
+      secure: true,
+      sameSite: "none", // must be "none" for cross-site (frontend & backend on different domains)
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
 
@@ -580,8 +580,8 @@ export const logoutEmployee = async (req, res) => {
   try {
     res.clearCookie("token", {
       httpOnly: true,
-      sameSite: "lax",
-      secure: false,
+      sameSite: "none", // must match the options used when the cookie was set
+      secure: true,
     });
 
     return res.status(200).json({
