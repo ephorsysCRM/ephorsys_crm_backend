@@ -212,7 +212,8 @@ export const updateCallStatus = asyncHandler(async (req, res) => {
   if (!lead) throw new AppError("Lead not found.", 404);
 
   // Authorization check for employees
-  if (req.employee && lead.assignedTo.toString() !== userId.toString()) {
+  const assignedEmpId = lead.assignedTo?._id ? lead.assignedTo._id.toString() : lead.assignedTo?.toString();
+  if (req.employee && assignedEmpId !== userId.toString()) {
     throw new AppError("Access denied. This lead is not assigned to you.", 403);
   }
 
@@ -292,7 +293,8 @@ export const scheduleMeeting = asyncHandler(async (req, res) => {
   if (!lead) throw new AppError("Lead not found.", 404);
 
   // Authorization check
-  if (req.employee && lead.assignedTo.toString() !== userId.toString()) {
+  const assignedEmpId = lead.assignedTo?._id ? lead.assignedTo._id.toString() : lead.assignedTo?.toString();
+  if (req.employee && assignedEmpId !== userId.toString()) {
     throw new AppError("Access denied.", 403);
   }
 
@@ -350,7 +352,8 @@ export const closeLead = asyncHandler(async (req, res) => {
   if (!lead) throw new AppError("Lead not found.", 404);
 
   // Authorization check
-  if (req.employee && lead.assignedTo.toString() !== userId.toString()) {
+  const assignedEmpId = lead.assignedTo?._id ? lead.assignedTo._id.toString() : lead.assignedTo?.toString();
+  if (req.employee && assignedEmpId !== userId.toString()) {
     throw new AppError("Access denied.", 403);
   }
 
@@ -607,10 +610,8 @@ export const getLeadById = asyncHandler(async (req, res) => {
   if (!lead) throw new AppError("Lead not found.", 404);
 
   // Employee can only view their own leads
-  if (
-    req.employee &&
-    lead.assignedTo._id.toString() !== req.employee._id.toString()
-  ) {
+  const assignedEmpId = lead.assignedTo?._id ? lead.assignedTo._id.toString() : lead.assignedTo?.toString();
+  if (req.employee && assignedEmpId !== req.employee._id.toString()) {
     throw new AppError("Access denied.", 403);
   }
 
