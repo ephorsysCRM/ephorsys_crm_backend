@@ -1,4 +1,5 @@
 import Lead, { CALL_STATUS } from "../models/lead.model.js";
+import EmployeeModel from "../models/employee.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
 import { getIO } from "../config/socketInstance.js";
@@ -404,13 +405,39 @@ export const getLeads = asyncHandler(async (req, res) => {
     filter.assignedTo = req.employee._id;
   }
 
-  // Optional search filter (case-insensitive regex on name or phone)
+  // Optional search filter (case-insensitive regex on name, phone, project, source, remarks, employee)
   if (search && search.trim()) {
-    const searchRegex = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-    filter.$or = [
+    const rawSearch = search.trim();
+    const searchRegex = new RegExp(rawSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const digitsOnly = rawSearch.replace(/\D/g, "");
+
+    const searchConditions = [
       { fullName: searchRegex },
       { mobileNumber: searchRegex },
+      { leadSource: searchRegex },
+      { projectType: searchRegex },
+      { remarks: searchRegex },
     ];
+
+    if (digitsOnly && digitsOnly.length >= 3) {
+      searchConditions.push({ mobileNumber: new RegExp(digitsOnly, "i") });
+    }
+
+    const matchedEmployees = await EmployeeModel.find({
+      $or: [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { officialEmail: searchRegex },
+      ],
+    }).select("_id");
+
+    if (matchedEmployees.length > 0) {
+      searchConditions.push({
+        assignedTo: { $in: matchedEmployees.map((e) => e._id) },
+      });
+    }
+
+    filter.$or = searchConditions;
   }
 
   // List-based filter
