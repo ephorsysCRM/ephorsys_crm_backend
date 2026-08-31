@@ -76,7 +76,7 @@ const getUserId = (req) => {
 };
 
 // HELPER: Group call statuses for logic
-const REJECTED_STATUSES = ["Blocked", "Wrong Number", "Denied"];
+const REJECTED_STATUSES = ["Blocked", "Wrong Number", "Denied", "Wrongly Inquired"];
 const NOT_PICKED_STATUSES = [
   "Not Connected",
   "Switch Off / Not Reachable",
@@ -395,13 +395,22 @@ export const closeLead = asyncHandler(async (req, res) => {
 // 5. GET LEADS BY LIST TYPE
 // ─────────────────────────────────────────────
 export const getLeads = asyncHandler(async (req, res) => {
-  const { list = "all", page = 1, limit = 20 } = req.query;
+  const { list = "all", page = 1, limit = 20, search = "" } = req.query;
 
   const filter = {};
 
   // Role-based scope
   if (req.employee) {
     filter.assignedTo = req.employee._id;
+  }
+
+  // Optional search filter (case-insensitive regex on name or phone)
+  if (search && search.trim()) {
+    const searchRegex = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    filter.$or = [
+      { fullName: searchRegex },
+      { mobileNumber: searchRegex },
+    ];
   }
 
   // List-based filter
@@ -418,6 +427,13 @@ export const getLeads = asyncHandler(async (req, res) => {
     case "meeting":
       filter.leadStatus = "Meeting";
       break;
+    case "todayMeetings": {
+      const smToday = new Date(); smToday.setHours(0, 0, 0, 0);
+      const emToday = new Date(); emToday.setHours(23, 59, 59, 999);
+      filter["meetings.meetingDate"] = { $gte: smToday, $lte: emToday };
+      filter.leadStatus = "Meeting";
+      break;
+    }
     case "closedWon":
       filter.leadStatus = "Closed Won";
       break;
