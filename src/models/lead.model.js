@@ -51,6 +51,7 @@ export const CALL_STATUS = [
   "Wrong Number",
   "Denied",
   "Not Picked",
+  "Wrongly Inquired",
 ];
 
 // ─────────────────────────────────────────────
