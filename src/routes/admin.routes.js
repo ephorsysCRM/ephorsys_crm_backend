@@ -4,6 +4,7 @@ import {
   loginAdmin,
   LogoutAdmin,
   registerAdmin,
+  updateAdmin,
 } from "../controllers/admin.controller.js";
 import protect from "../middleware/auth.middleware.js";
 import isEmployeeMiddleware from "../middleware/isEmployee.middleware.js";
@@ -34,6 +35,10 @@ router.post("/logout", LogoutAdmin);
 // ------------------------------------------------------
 router.get("/profile", protect, getAdminProfile);
 
-
+// ------------------------------------------------------
+// Update Admin Profile / Password
+// PATCH -> /api/v1/admin/update
+// ------------------------------------------------------
+router.patch("/update", protect, updateAdmin);
 
 export default router;

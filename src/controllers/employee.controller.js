@@ -686,6 +686,8 @@ export const updateEmployee = async (req, res) => {
       payroll,
       educationDetails,
       experienceDetails,
+      newPassword,
+      confirmPassword,
     } = req.body;
 
     const employee = await EmployeeModel.findById(id);
@@ -693,6 +695,44 @@ export const updateEmployee = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Employee not found" });
+    }
+
+    // ─────────────────────────────────────────
+    // Password Update (Admin sets new password)
+    // No old-password check — admin has authority to reset
+    // ─────────────────────────────────────────
+    if (newPassword || confirmPassword) {
+      if (!newPassword || !confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "Both newPassword and confirmPassword are required",
+        });
+      }
+
+      if (/\s/.test(newPassword)) {
+        return res.status(400).json({
+          success: false,
+          message: "Password must not contain spaces",
+        });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "New password and confirm password do not match",
+        });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: "Password must be at least 6 characters long",
+        });
+      }
+
+      // Assign directly — the pre-save hook in the model will hash it
+      employee.password = newPassword;
+      await employee.save();
     }
 
     if (root) {
