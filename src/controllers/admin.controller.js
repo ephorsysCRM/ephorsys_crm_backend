@@ -222,3 +222,84 @@ export const getAdminProfile = async (req, res) => {
     });
   }
 };
+
+// -------------------------------------------------------
+// @description - Update Admin Profile / Password
+// @route       - PATCH /api/v1/admin/update
+// @access      - Private (Admin)
+// -------------------------------------------------------
+
+export const updateAdmin = async (req, res) => {
+  try {
+    const { name, email, newPassword, confirmPassword } = req.body;
+
+    const admin = await AdminModel.findById(req.admin._id);
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin Not Found",
+      });
+    }
+
+    // ------------------------------------------
+    // Update name / email if provided
+    // ------------------------------------------
+    if (name) admin.name = name;
+    if (email) admin.email = email;
+
+    // ------------------------------------------
+    // Password Update (no old-password check)
+    // ------------------------------------------
+    if (newPassword || confirmPassword) {
+      if (!newPassword || !confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "Both newPassword and confirmPassword are required",
+        });
+      }
+
+      if (/\s/.test(newPassword)) {
+        return res.status(400).json({
+          success: false,
+          message: "Password must not contain spaces",
+        });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "New password and confirm password do not match",
+        });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: "Password must be at least 6 characters long",
+        });
+      }
+
+      // The pre-save hook in AdminModel will hash this automatically
+      admin.password = newPassword;
+    }
+
+    await admin.save();
+
+    const updatedAdmin = await AdminModel.findById(admin._id).select(
+      "-password"
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Admin updated successfully",
+      data: updatedAdmin,
+    });
+  } catch (error) {
+    console.error("Update Admin Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
