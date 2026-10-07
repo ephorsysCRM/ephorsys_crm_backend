@@ -1,5 +1,18 @@
+import crypto from "crypto";
 import AdminModel from "../models/admin.model.js";
 import generateToken from "../utils/generateToken.js";
+import sendEmail from "../utils/sendEmail.js";
+import { getPasswordResetEmail } from "../utils/emailTemplates.js";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const OTP_EXPIRY_MINUTES = 10;
+const RESET_TOKEN_EXPIRY_MINUTES = 15;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const normalizeEmail = (email) => email?.toString().trim().toLowerCase();
+const hashValue = (value) => crypto.createHash("sha256").update(value).digest("hex");
+const respond = (res, status, success, message, extra = {}) =>
+  res.status(status).json({ success, message, ...extra });
 // -----------------------------------------------------
 // @description -   Register Admin
 // @route -   POST /api/v1/admin/register
@@ -229,77 +242,236 @@ export const getAdminProfile = async (req, res) => {
 // @access      - Private (Admin)
 // -------------------------------------------------------
 
-export const updateAdmin = async (req, res) => {
+// export const updateAdmin = async (req, res) => {
+//   try {
+//     const { name, email, newPassword, confirmPassword } = req.body;
+
+//     const admin = await AdminModel.findById(req.admin._id);
+//     if (!admin) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Admin Not Found",
+//       });
+//     }
+
+//     // ------------------------------------------
+//     // Update name / email if provided
+//     // ------------------------------------------
+//     if (name) admin.name = name;
+//     if (email) admin.email = email;
+
+//     // ------------------------------------------
+//     // Password Update (no old-password check)
+//     // ------------------------------------------
+//     if (newPassword || confirmPassword) {
+//       if (!newPassword || !confirmPassword) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Both newPassword and confirmPassword are required",
+//         });
+//       }
+
+//       if (/\s/.test(newPassword)) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Password must not contain spaces",
+//         });
+//       }
+
+//       if (newPassword !== confirmPassword) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "New password and confirm password do not match",
+//         });
+//       }
+
+//       if (newPassword.length < 6) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Password must be at least 6 characters long",
+//         });
+//       }
+
+//       // The pre-save hook in AdminModel will hash this automatically
+//       admin.password = newPassword;
+//     }
+
+//     await admin.save();
+
+//     const updatedAdmin = await AdminModel.findById(admin._id).select(
+//       "-password"
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Admin updated successfully",
+//       data: updatedAdmin,
+//     });
+//   } catch (error) {
+//     console.error("Update Admin Error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message,
+//     });
+//   }
+// };
+
+//-------------------------------------------------------
+//@description - Forget Admin Password
+//@route - POST /api/v1/admin/forget-password
+//@access Public
+//-------------------------------------------------------
+
+export const forgetPasswordAdmin = async (req, res) => {
   try {
-    const { name, email, newPassword, confirmPassword } = req.body;
+    const email = normalizeEmail(req.body?.email);
+    if (!email) {
+      return respond(res, 400, false, "Email is Required");
+    }
 
-    const admin = await AdminModel.findById(req.admin._id);
+    const admin = await AdminModel.findOne({ email });
     if (!admin) {
-      return res.status(404).json({
-        success: false,
-        message: "Admin Not Found",
+      // Always return 200 to prevent email enumeration
+      return respond(res, 200, true, "If an admin exists with this email, a reset OTP has been sent");
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const emailContent = getPasswordResetEmail(otp);
+
+    admin.passwordResetOtp = hashValue(otp);
+    admin.passwordResetOtpExpires = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+    admin.passwordResetToken = undefined;
+    admin.passwordResetTokenExpires = undefined;
+    admin.passwordResetVerified = false;
+
+    await admin.save({ validateBeforeSave: false });
+
+    try {
+      await sendEmail({
+        to: admin.email,
+        subject: emailContent.subject,
+        text: emailContent.text,
+        html: emailContent.html,
       });
+    } catch (mailError) {
+      // Rollback OTP fields if mail fails
+      admin.passwordResetOtp = undefined;
+      admin.passwordResetOtpExpires = undefined;
+      admin.passwordResetVerified = false;
+      await admin.save({ validateBeforeSave: false });
+
+      console.error("Password Reset Mail Error:", mailError);
+      return respond(res, 500, false, "Unable to send password reset email");
     }
 
-    // ------------------------------------------
-    // Update name / email if provided
-    // ------------------------------------------
-    if (name) admin.name = name;
-    if (email) admin.email = email;
+    return respond(res, 200, true, "If an admin exists with this email, a reset OTP has been sent");
+  } catch (error) {
+    console.error("Forget Password Error:", error);
+    return respond(res, 500, false, "Internal Server Error", { error: error.message });
+  }
+};
 
-    // ------------------------------------------
-    // Password Update (no old-password check)
-    // ------------------------------------------
-    if (newPassword || confirmPassword) {
-      if (!newPassword || !confirmPassword) {
-        return res.status(400).json({
-          success: false,
-          message: "Both newPassword and confirmPassword are required",
-        });
-      }
+//-------------------------------------------------------
+//@description - Verify Admin Password Reset OTP
+//@route - POST /api/v1/admin/verify-reset-otp
+//@access Public
+//-------------------------------------------------------
 
-      if (/\s/.test(newPassword)) {
-        return res.status(400).json({
-          success: false,
-          message: "Password must not contain spaces",
-        });
-      }
+export const verifyResetOtpAdmin = async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const otp = req.body?.otp?.toString().trim();
 
-      if (newPassword !== confirmPassword) {
-        return res.status(400).json({
-          success: false,
-          message: "New password and confirm password do not match",
-        });
-      }
-
-      if (newPassword.length < 6) {
-        return res.status(400).json({
-          success: false,
-          message: "Password must be at least 6 characters long",
-        });
-      }
-
-      // The pre-save hook in AdminModel will hash this automatically
-      admin.password = newPassword;
+    if (!email || !otp) {
+      return respond(res, 400, false, "Email and OTP are Required");
     }
+
+    const admin = await AdminModel.findOne({ email }).select(
+      "+passwordResetOtp +passwordResetOtpExpires +passwordResetToken +passwordResetTokenExpires +passwordResetVerified",
+    );
+
+    if (
+      !admin ||
+      !admin.passwordResetOtp ||
+      !admin.passwordResetOtpExpires ||
+      admin.passwordResetOtpExpires < new Date() ||
+      admin.passwordResetOtp !== hashValue(otp)
+    ) {
+      return respond(res, 400, false, "Invalid or expired OTP");
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    admin.passwordResetOtp = undefined;
+    admin.passwordResetOtpExpires = undefined;
+    admin.passwordResetToken = hashValue(resetToken);
+    admin.passwordResetTokenExpires = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+    admin.passwordResetVerified = true;
+
+    await admin.save({ validateBeforeSave: false });
+
+    return respond(res, 200, true, "OTP verified successfully", {
+      data: {
+        resetToken,
+        expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
+      },
+    });
+  } catch (error) {
+    console.error("Verify Reset OTP Error:", error);
+    return respond(res, 500, false, "Internal Server Error", { error: error.message });
+  }
+};
+
+//-------------------------------------------------------
+//@description - Reset Admin Password
+//@route - POST /api/v1/admin/reset-password
+//@access Public
+//-------------------------------------------------------
+
+export const resetPasswordAdmin = async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const resetToken = req.body?.resetToken?.trim();
+    const { password, confirmPassword } = req.body || {};
+
+    if (!email || !resetToken || !password || !confirmPassword) {
+      return respond(res, 400, false, "Email, reset token, password, and confirm password are Required");
+    }
+
+    if (password !== confirmPassword) {
+      return respond(res, 400, false, "Password and confirm password do not match");
+    }
+
+    if (password.length < 8) {
+      return respond(res, 400, false, "Password must be at least 8 characters");
+    }
+
+    const admin = await AdminModel.findOne({ email }).select(
+      "+password +passwordResetToken +passwordResetTokenExpires +passwordResetVerified",
+    );
+
+    if (
+      !admin ||
+      !admin.passwordResetVerified ||
+      !admin.passwordResetToken ||
+      !admin.passwordResetTokenExpires ||
+      admin.passwordResetTokenExpires < new Date() ||
+      admin.passwordResetToken !== hashValue(resetToken)
+    ) {
+      return respond(res, 400, false, "Invalid or expired reset token");
+    }
+
+    admin.password = password;
+    admin.passwordResetToken = undefined;
+    admin.passwordResetTokenExpires = undefined;
+    admin.passwordResetVerified = false;
 
     await admin.save();
 
-    const updatedAdmin = await AdminModel.findById(admin._id).select(
-      "-password"
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: "Admin updated successfully",
-      data: updatedAdmin,
-    });
+    return respond(res, 200, true, "Password reset successfully");
   } catch (error) {
-    console.error("Update Admin Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-      error: error.message,
-    });
+    console.error("Reset Password Error:", error);
+    return respond(res, 500, false, "Internal Server Error", { error: error.message });
   }
 };

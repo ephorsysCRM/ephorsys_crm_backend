@@ -1,4 +1,5 @@
 import Lead, { CALL_STATUS } from "../models/lead.model.js";
+import EmployeeModel from "../models/employee.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
 import { getIO } from "../config/socketInstance.js";
@@ -76,7 +77,7 @@ const getUserId = (req) => {
 };
 
 // HELPER: Group call statuses for logic
-const REJECTED_STATUSES = ["Blocked", "Wrong Number", "Denied"];
+const REJECTED_STATUSES = ["Blocked", "Wrong Number", "Denied", "Wrongly Inquired"];
 const NOT_PICKED_STATUSES = [
   "Not Connected",
   "Switch Off / Not Reachable",
@@ -211,7 +212,8 @@ export const updateCallStatus = asyncHandler(async (req, res) => {
   if (!lead) throw new AppError("Lead not found.", 404);
 
   // Authorization check for employees
-  if (req.employee && lead.assignedTo.toString() !== userId.toString()) {
+  const assignedEmpId = lead.assignedTo?._id ? lead.assignedTo._id.toString() : lead.assignedTo?.toString();
+  if (req.employee && assignedEmpId !== userId.toString()) {
     throw new AppError("Access denied. This lead is not assigned to you.", 403);
   }
 
@@ -291,7 +293,8 @@ export const scheduleMeeting = asyncHandler(async (req, res) => {
   if (!lead) throw new AppError("Lead not found.", 404);
 
   // Authorization check
-  if (req.employee && lead.assignedTo.toString() !== userId.toString()) {
+  const assignedEmpId = lead.assignedTo?._id ? lead.assignedTo._id.toString() : lead.assignedTo?.toString();
+  if (req.employee && assignedEmpId !== userId.toString()) {
     throw new AppError("Access denied.", 403);
   }
 
@@ -349,7 +352,8 @@ export const closeLead = asyncHandler(async (req, res) => {
   if (!lead) throw new AppError("Lead not found.", 404);
 
   // Authorization check
-  if (req.employee && lead.assignedTo.toString() !== userId.toString()) {
+  const assignedEmpId = lead.assignedTo?._id ? lead.assignedTo._id.toString() : lead.assignedTo?.toString();
+  if (req.employee && assignedEmpId !== userId.toString()) {
     throw new AppError("Access denied.", 403);
   }
 
@@ -395,13 +399,48 @@ export const closeLead = asyncHandler(async (req, res) => {
 // 5. GET LEADS BY LIST TYPE
 // ─────────────────────────────────────────────
 export const getLeads = asyncHandler(async (req, res) => {
-  const { list = "all", page = 1, limit = 20 } = req.query;
+  const { list = "all", page = 1, limit = 20, search = "" } = req.query;
 
   const filter = {};
 
   // Role-based scope
   if (req.employee) {
     filter.assignedTo = req.employee._id;
+  }
+
+  // Optional search filter (case-insensitive regex on name, phone, project, source, remarks, employee)
+  if (search && search.trim()) {
+    const rawSearch = search.trim();
+    const searchRegex = new RegExp(rawSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const digitsOnly = rawSearch.replace(/\D/g, "");
+
+    const searchConditions = [
+      { fullName: searchRegex },
+      { mobileNumber: searchRegex },
+      { leadSource: searchRegex },
+      { projectType: searchRegex },
+      { remarks: searchRegex },
+    ];
+
+    if (digitsOnly && digitsOnly.length >= 3) {
+      searchConditions.push({ mobileNumber: new RegExp(digitsOnly, "i") });
+    }
+
+    const matchedEmployees = await EmployeeModel.find({
+      $or: [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { officialEmail: searchRegex },
+      ],
+    }).select("_id");
+
+    if (matchedEmployees.length > 0) {
+      searchConditions.push({
+        assignedTo: { $in: matchedEmployees.map((e) => e._id) },
+      });
+    }
+
+    filter.$or = searchConditions;
   }
 
   // List-based filter
@@ -418,6 +457,13 @@ export const getLeads = asyncHandler(async (req, res) => {
     case "meeting":
       filter.leadStatus = "Meeting";
       break;
+    case "todayMeetings": {
+      const smToday = new Date(); smToday.setHours(0, 0, 0, 0);
+      const emToday = new Date(); emToday.setHours(23, 59, 59, 999);
+      filter["meetings.meetingDate"] = { $gte: smToday, $lte: emToday };
+      filter.leadStatus = "Meeting";
+      break;
+    }
     case "closedWon":
       filter.leadStatus = "Closed Won";
       break;
@@ -564,10 +610,8 @@ export const getLeadById = asyncHandler(async (req, res) => {
   if (!lead) throw new AppError("Lead not found.", 404);
 
   // Employee can only view their own leads
-  if (
-    req.employee &&
-    lead.assignedTo._id.toString() !== req.employee._id.toString()
-  ) {
+  const assignedEmpId = lead.assignedTo?._id ? lead.assignedTo._id.toString() : lead.assignedTo?.toString();
+  if (req.employee && assignedEmpId !== req.employee._id.toString()) {
     throw new AppError("Access denied.", 403);
   }
 

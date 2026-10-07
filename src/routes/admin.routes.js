@@ -4,7 +4,9 @@ import {
   loginAdmin,
   LogoutAdmin,
   registerAdmin,
-  updateAdmin,
+  forgetPasswordAdmin,
+  verifyResetOtpAdmin,
+  resetPasswordAdmin,
 } from "../controllers/admin.controller.js";
 import protect from "../middleware/auth.middleware.js";
 import isEmployeeMiddleware from "../middleware/isEmployee.middleware.js";
@@ -39,6 +41,22 @@ router.get("/profile", protect, getAdminProfile);
 // Update Admin Profile / Password
 // PATCH -> /api/v1/admin/update
 // ------------------------------------------------------
-router.patch("/update", protect, updateAdmin);
+// router.patch("/update", protect, updateAdmin);
+
+// ------------------------------------------------------
+// Password Reset Routes (Public)
+// ------------------------------------------------------
+
+// Forget Admin Password (sends OTP)
+// POST -> /api/v1/admin/forget-password
+router.post("/forget-password", forgetPasswordAdmin);
+
+// Verify Admin Password Reset OTP
+// POST -> /api/v1/admin/verify-reset-otp
+router.post("/verify-reset-otp", verifyResetOtpAdmin);
+
+// Reset Admin Password
+// POST -> /api/v1/admin/reset-password
+router.post("/reset-password", resetPasswordAdmin);
 
 export default router;
